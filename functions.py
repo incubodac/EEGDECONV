@@ -36,7 +36,26 @@ def closest_tuple(tuples, threshold, point):
 
 
 
-def add_trial_info_to_events(evts,bh_data):
+def add_trial_info_to_events(evts,bh_data,thr):
+    from paths import paths
+    import setup
+    import matplotlib.image as mpimg
+    import pandas as pd
+
+    threshold = thr
+    image_names = bh_data['searchimage'].drop_duplicates().str.split('cmp_', expand=True)[1].str.split('.jpg', expand=True)[0].to_list()
+    path =    paths()
+    exp_path = path.experiment_path()
+    targets  = bh_data.loc[::6,['st5']] #first column has image name and second T/A(absent)
+    target_files = targets['st5'].str.lstrip('memstim').str.lstrip('/')[:-1] #target filenames
+    exp_path = path.experiment_path()
+    info = setup.exp_info()
+    screensize = info.screen_size#[ 1920,1080 ]
+    item_pos = path.item_pos_path()
+    df = pd.read_csv(item_pos)
+
+        
+    
     import numpy as np
     def key2bool(val):
         if val == 'right':
@@ -58,6 +77,8 @@ def add_trial_info_to_events(evts,bh_data):
     evts['ondistractor']   = np.nan
     evts['present']        = np.nan
     evts['correct']        = np.nan
+    evts['stm']            = np.nan
+
     msss     = list(bh_data.loc[::6,'Nstim'])
     presents = list((bh_data.loc[::6,'st5_cat']=='T' ) & ~(bh_data.loc[::6,'st5']=='memstim/dog1962.png'))
     pressed = bh_data.loc[5::6,'key_resp.keys']
@@ -73,6 +94,30 @@ def add_trial_info_to_events(evts,bh_data):
     for index, row  in evts.iterrows():
         if evts.at[index,'type']=='cross1':
             tr+=1
+            image_name   = image_names[tr-1]
+            img = mpimg.imread(exp_path + 'cmp_' + image_name + '.jpg')
+            xim = (screensize[0]-img.shape[1])/2
+            yim = (screensize[1]-img.shape[0])/2
+            trial_stims  = df[df['folder']==image_name]
+    
+            records = trial_stims.to_records(index=False)
+            item_pos = [(record[6]+record[5]/2, record[7]+record[4]/2) for record in records]
+            if presents[tr-1]:
+                target_pos = trial_stims[trial_stims['stm']==target_files.iloc[tr-1]][['height','width','pos_x','pos_y']].to_records(index=False)
+                target_pos = target_pos[0]
+                target_pos = target_pos[2]+target_pos[1]/2,target_pos[3]+target_pos[0]/2
+            else:
+                target_pos = None    
+            try:
+                if presents[tr-1]:
+                    if not target_pos:
+                        raise ValueError("ima_pos is empty, but flag is True")
+                else:
+                    if target_pos:
+                        raise ValueError("ima_pos is not empty, but flag is False")
+            except ValueError as e:
+                print(f"Sanity check failed: {str(e)}")
+                
         elif evts.at[index,'type'] in emvs:
             evts.at[index,'trial'] = tr
             evts.at[index,'mss']   = msss[tr-1]
@@ -87,6 +132,38 @@ def add_trial_info_to_events(evts,bh_data):
                 evts.at[index,'phase'] = 'cross2'
             elif vs_start_samp[tr-1] < evts.at[index,'latency'] < vs_stop_samp[tr-1]:
                 evts.at[index,'phase'] = 'vs'
+                point = (evts.at[index,'fix_avgpos_x']-xim,evts.at[index,'fix_avgpos_y']-yim)
+            
+                flag, closest_id = closest_tuple(item_pos, threshold, point)
+                if not flag:
+                    continue
+                elif item_pos[closest_id]==target_pos:
+                    evts.at[index,'ontarget']      = True
+                    evts.at[index,'ondistractor']  = False
+                    evts.at[index,'stm']           = trial_stims['stm'].iloc[closest_id]
+                else:
+                    evts.at[index,'ontarget']      = False
+                    evts.at[index,'ondistractor']  = True
+                    evts.at[index,'stm']           = trial_stims['stm'].iloc[closest_id]
+    
+    cross1_counts = len(evts[(evts['type']=='fixation') & (evts['phase']=='cross1')])
+    mem_counts    = len(evts[(evts['type']=='fixation') & (evts['phase']=='mem')])
+    cross2_counts = len(evts[(evts['type']=='fixation') & (evts['phase']=='cross2')])
+    vs_counts     = len(evts[(evts['type']=='fixation') & (evts['phase']=='vs')])
+    
+    print(f'fixations in cross1 phase : {cross1_counts}\n')
+    print(f'fixations in mem phase    : {mem_counts}\n')
+    print(f'fixations in cross2 phase : {cross2_counts}\n')
+    print(f'fixations in vs phase     : {vs_counts}\n')
+    print(evts['type'].value_counts())
+    total_captured_fixs = sum((evts['ondistractor']) | (evts['ontarget']))
+    on_targets  = sum((evts['ontarget']==True))
+    on_distractors = sum((evts['ondistractor']==True))
+    print(f'total fixations on items    : {total_captured_fixs}')
+    print(f'fixations on targets  : {on_targets}')
+    print(f'fixations on distractors  : {on_distractors}')
+    print(f'percentage of capture fixations in vs {100*total_captured_fixs/vs_counts:.1f}%')
+
                                  
     return evts
    
@@ -139,6 +216,6 @@ if __name__ == '__main__':
     # point = (5, 6)
     # closest= closest_tuple(tuples, threshold, point)
     # print(closest)  # Output: (1, 2)
-    evts = add_trial_info_to_events(evts,bh_data)
-    plot_fix_durs_mem_vs(evts)
+    #evts = add_trial_info_to_events(evts,bh_data)
+    #plot_fix_durs_mem_vs(evts)
 
