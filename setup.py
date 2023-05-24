@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import pathlib
 import os
+import logging
 
 
 class exp_info:
@@ -25,6 +26,8 @@ class exp_info:
     # Define set and fdt path and et data path
         self.eeg_path = paths().eeg_analysis_path()
         self.raw_path = paths().eeg_raw_path()
+        self.results_path = paths().results_path()
+
 
         # Select subject
         self.subjects_ids = ['S101','S102','S103','S104','S105','S106','S107','S108','S109','S110','S111',
@@ -58,8 +61,14 @@ class exp_info:
         
         self.screen_size = (1920,1080)
 
-        
-        
+    def initialize_logging(self):
+    # Initialize logging configuration
+        logging.basicConfig(filename=os.path.join(self.results_path,'analysis_log.txt'), level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.info("-----------------------------------------------------")
+        logging.info("-----------------------------------------------------")
+
+
+    
 
 
 class config:
@@ -236,39 +245,6 @@ class eeg_subject:
         else:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
 
-
-    # ET data
-    def load_raw_et_data(self):
-        """
-        load ET parseeyelink matlab struct
-        """
-        print('\nLoading Preprocessed et data')
-        
-        # get subject path
-        et_path = paths().et_path()
-        file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
-
-        # Load data
-        fif = mne.io.read_raw_fif(file_path, preload=preload)
-
-        return fif
-        
-
-
-
-    # Behavioural data
-    def load_raw_bh_data(self):
-        """
-        Behavioural data for parent subject as pandas DataFrames.
-        """
-        # Get subject path
-        subj_path = self.bh_path
-        bh_file = list(subj_path.glob('*.csv'.format(self.subject_id)))[0]
-
-        # Load DataFrame
-        df = pd.read_csv(bh_file)
-
-        return df
 
 
     # MEG data

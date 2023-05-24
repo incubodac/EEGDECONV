@@ -1,4 +1,4 @@
-
+import logging
 
 def start_stop_samples_trigg(evts,trigg):
     trigg_samples = evts[evts['type']==trigg]['latency'].to_numpy().astype(int)
@@ -41,6 +41,7 @@ def add_trial_info_to_events(evts,bh_data,thr):
     import setup
     import matplotlib.image as mpimg
     import pandas as pd
+
 
     threshold = thr
     image_names = bh_data['searchimage'].drop_duplicates().str.split('cmp_', expand=True)[1].str.split('.jpg', expand=True)[0].to_list()
@@ -150,19 +151,40 @@ def add_trial_info_to_events(evts,bh_data,thr):
     mem_counts    = len(evts[(evts['type']=='fixation') & (evts['phase']=='mem')])
     cross2_counts = len(evts[(evts['type']=='fixation') & (evts['phase']=='cross2')])
     vs_counts     = len(evts[(evts['type']=='fixation') & (evts['phase']=='vs')])
+    answer_acc = 100*sum(corrects)/len(corrects)
     
+    print(f'percentage of correct answers : {answer_acc:.1f}')
     print(f'fixations in cross1 phase : {cross1_counts}\n')
     print(f'fixations in mem phase    : {mem_counts}\n')
     print(f'fixations in cross2 phase : {cross2_counts}\n')
     print(f'fixations in vs phase     : {vs_counts}\n')
     print(evts['type'].value_counts())
     total_captured_fixs = sum((evts['ondistractor']) | (evts['ontarget']))
+    total_item_fixed = 100*total_captured_fixs/vs_counts
     on_targets  = sum((evts['ontarget']==True))
     on_distractors = sum((evts['ondistractor']==True))
+    
+
+      
     print(f'total fixations on items    : {total_captured_fixs}')
     print(f'fixations on targets  : {on_targets}')
-    print(f'fixations on distractors  : {on_distractors}')
-    print(f'percentage of capture fixations in vs {100*total_captured_fixs/vs_counts:.1f}%')
+    print(f'fixations on distractors  : {on_distractors}') 
+    print(f'percentage of capture fixations in vs {total_item_fixed:.1f}%')
+
+
+    logging.info("Percentage of correct answers: %.1f %%", answer_acc)
+    logging.info("Cross1: %d", cross1_counts)
+    logging.info("Mem: %d", mem_counts)
+    logging.info("Cross2: %d", cross2_counts)
+    logging.info("VS: %d", vs_counts)
+    logging.info("Total fixations on items (vs): %d", total_captured_fixs)
+    logging.info("Total fixations on targets: %d", on_targets)
+    logging.info("Total fixations on distractors: %d", on_distractors)
+    logging.info("Percentage of capture fixations (vs): %.1f %%", total_item_fixed)
+
+
+
+
 
                                  
     return evts
@@ -200,7 +222,74 @@ def plot_fix_durs_all_phases(evts):
     plt.tight_layout()
     plt.show()  
      
+def plot_trial(eeg,suj,tr):
+    from paths import paths
+    import setup
+    import matplotlib.image as mpimg
+    from matplotlib import pyplot as plt 
+    import matplotlib.patches as patches
+    import pandas as pd
 
+    path =    paths()
+    exp_path = path.experiment_path()
+    item_pos = path.item_pos_path()
+    #suj  = load.subject(info,0)
+    info = setup.exp_info()
+    screensize = info.screen_size
+    bh_data     = suj.load_bh_csv()
+    evts = suj.load_event_struct()
+    image_names = bh_data['searchimage'].drop_duplicates()
+    image_names = image_names.str.split('cmp_', expand=True)[1]
+    image_names = image_names.str.split('.jpg', expand=True)[0]
+
+    star_samp, stop_samp = start_stop_samples_trigg(evts,'vs')
+    image_names = list(image_names)
+    image_name  = image_names[tr-1]
+    y,x = suj.get_et_data(eeg,[star_samp[tr-1],stop_samp[tr-1]])
+    img = mpimg.imread(exp_path + 'cmp_' + image_name + '.jpg')
+
+    xim = (screensize[0]-img.shape[1])/2
+    yim = (screensize[1]-img.shape[0])/2
+
+    fig, ax = plt.subplots()##############  SIZE
+    ax.imshow(img)
+    ax.plot(y*1e6-xim,x*1e6-yim,'black')
+
+    #################check fix evt marks correspondence with scanpath#############
+    fix_start_samps = start_samples_trigg(evts,'fixation')
+    fixs_lats = [x for x in fix_start_samps if star_samp[tr-1]  <   x  <  stop_samp[tr-1]]
+
+
+
+    for i in fixs_lats:
+        xf = eeg[info.et_channel_names[0],i][0]
+        yf = eeg[info.et_channel_names[1],i][0]
+        ax.scatter(xf*1e6-xim,yf*1e6-yim,s=50,color='blue')
+        ####add fixations positions from evts data###########
+        #point = evts[evts['latency']==i][['fix_avgpos_x','fix_avgpos_y']]
+        x_ev = evts[evts['latency']==i]['fix_avgpos_x']
+        y_ev = evts[evts['latency']==i]['fix_avgpos_y']
+        ax.scatter(x_ev-xim,y_ev-yim,s=40,color='g')
+
+
+    #############################################################################
+    df = pd.read_csv(item_pos)
+
+    for index, row in df[df['folder']==image_name].iterrows():
+    # Create a rectangle patch for the bounding box
+        rect = patches.Rectangle((row['pos_x'], row['pos_y']), row['width'], row['height'], linewidth=2, edgecolor='r', facecolor='none')
+        
+        # Add the rectangle patch to the plot
+        ax.add_patch(rect)
+    #########add centers#######
+    #df is position csv image_name is searchimage
+    trial_stims = df[df['folder']==image_name]
+    records = trial_stims.to_records(index=False)
+    # Extract the (x, y) values from each record as a tuple using a list comprehension
+    centers_list = [(record[6]+record[5]/2, record[7]+record[4]/2) for record in records]
+    #closest_tuple(centers_list, 40, (419,500))
+    for i in range(len(centers_list)):
+        plt.scatter(centers_list[i][0],centers_list[i][1],color='black')
 
 if __name__ == '__main__':
     import setup

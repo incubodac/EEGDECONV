@@ -7,7 +7,7 @@ import mne
 import pandas as pd
 import matplotlib.pyplot as plt
 from art import *
-#import functions_general
+import logging
 
 
 def config(path, fname):
@@ -187,6 +187,9 @@ class subject:
             print('Subject not found.')
             
         self.subject_id   = subject_id
+        logging.info("Class containing subject %s information was loaded",self.subject_id)
+        logging.info("-----------------------------------------------------")
+
     
     def load_bh_csv(self):
         bh_csv_path = paths().eeg_raw_path() + self.subject_id + '/'
