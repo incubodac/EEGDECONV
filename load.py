@@ -187,8 +187,9 @@ class subject:
             print('Subject not found.')
             
         self.subject_id   = subject_id
-        logging.info("Class containing subject %s information was loaded",self.subject_id)
-        logging.info("-----------------------------------------------------")
+        logger = logging.getLogger()
+        logger.info("Class containing subject %s information was loaded",self.subject_id)
+        logger.info("-----------------------------------------------------")
 
     
     def load_bh_csv(self):
@@ -202,7 +203,10 @@ class subject:
             from   {csv_files}\n''',font="fancy67")
             csv_path = os.path.join(bh_csv_path, csv_files[0])
             df = pd.read_csv(csv_path)
-            # Do whatever you need to do with the DataFrame here
+            logger = logging.getLogger()
+            logger.info("Behaviour csv from subject %s was loaded",self.subject_id)
+            logger.info("-----------------------------------------------------")
+
             return df
         else:
             print('Error: There is not exactly one CSV file in the folder.\n')
@@ -233,6 +237,9 @@ class subject:
         # Load sesions
         try:
             df = pd.read_csv(evts_file)
+            logger = logging.getLogger()
+            logger.info("Events csv from subject %s was loaded",self.subject_id)
+            logger.info("-----------------------------------------------------")
             return df
         # Missing data
         except FileNotFoundError:
@@ -262,7 +269,7 @@ class subject:
 
 if __name__== '__main__':
     sub = setup.exp_info()
-    pp=subject(sub,0)        
+    pp=   subject(sub,0)        
     raw      = pp.load_analysis_eeg()
     samlim = [133,2000000]
     event=pp.get_et_data(raw,samlim,1)

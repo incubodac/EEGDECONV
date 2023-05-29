@@ -138,5 +138,41 @@ class paths:
         exp_path = self.main_path + 'HybridSearch/Psychopy experimento/'
 
         return exp_path
+    
+    def log_path(self):
+        """
+        Paths to the logs folder
+
+        Returns
+        -------
+        log_path: str
+            Path in str format to the folder to store the log files.
+        """
+
+        log_path = self.main_path + 'Hybrid_ana_out/logs/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(log_path, exist_ok=True)
+        
+        return log_path
+    
+    def full_metadata_path(self):
+        """
+        Paths to the logs folder
+
+        Returns
+        -------
+        log_path: str
+            Path in str format to the folder to store the log files.
+        """
+
+        full_metadata_path = self.main_path + 'Hybrid_ana_out/metadata/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(full_metadata_path, exist_ok=True)
+        
+        return full_metadata_path
+
+
 
 

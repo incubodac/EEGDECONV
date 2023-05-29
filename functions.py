@@ -1,4 +1,8 @@
 import logging
+import load
+import os
+
+
 
 def start_stop_samples_trigg(evts,trigg):
     trigg_samples = evts[evts['type']==trigg]['latency'].to_numpy().astype(int)
@@ -171,22 +175,18 @@ def add_trial_info_to_events(evts,bh_data,thr):
     print(f'fixations on distractors  : {on_distractors}') 
     print(f'percentage of capture fixations in vs {total_item_fixed:.1f}%')
 
+    logger = logging.getLogger()
+    logger.info("Percentage of correct answers: %.1f %%", answer_acc)
+    logger.info("Cross1: %d", cross1_counts)
+    logger.info("Mem: %d", mem_counts)
+    logger.info("Cross2: %d", cross2_counts)
+    logger.info("VS: %d", vs_counts)
+    logger.info("Total fixations on items (vs): %d", total_captured_fixs)
+    logger.info("Total fixations on targets: %d", on_targets)
+    logger.info("Total fixations on distractors: %d", on_distractors)
+    logger.info("Percentage of capture fixations (vs): %.1f %%", total_item_fixed)
 
-    logging.info("Percentage of correct answers: %.1f %%", answer_acc)
-    logging.info("Cross1: %d", cross1_counts)
-    logging.info("Mem: %d", mem_counts)
-    logging.info("Cross2: %d", cross2_counts)
-    logging.info("VS: %d", vs_counts)
-    logging.info("Total fixations on items (vs): %d", total_captured_fixs)
-    logging.info("Total fixations on targets: %d", on_targets)
-    logging.info("Total fixations on distractors: %d", on_distractors)
-    logging.info("Percentage of capture fixations (vs): %.1f %%", total_item_fixed)
-
-
-
-
-
-                                 
+                        
     return evts
    
 
@@ -290,6 +290,20 @@ def plot_trial(eeg,suj,tr):
     #closest_tuple(centers_list, 40, (419,500))
     for i in range(len(centers_list)):
         plt.scatter(centers_list[i][0],centers_list[i][1],color='black')
+
+def create_full_metadata(info,sub_id,metadata_path,capturing_thr,save_evts=False):
+    suj  = load.subject(info, sub_id)
+    eeg  = suj.load_analysis_eeg()
+    #eeg  = suj.load_electrode_positions(eeg)
+    evts = suj.load_event_struct()
+    bh_data     = suj.load_bh_csv()
+    evts = add_trial_info_to_events(evts,bh_data,capturing_thr)
+    if save_evts:
+        # Save epoched data     
+        evts.to_csv(os.path.join(metadata_path,f'{sub_id}_full_metadata.csv'), index=False)
+        logger = logging.getLogger()
+        logger.info("saving full metadata for subject: %s ", sub_id)
+    return evts
 
 if __name__ == '__main__':
     import setup

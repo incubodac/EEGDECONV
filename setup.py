@@ -5,6 +5,7 @@ import numpy as np
 import pathlib
 import os
 import logging
+import datetime
 
 
 class exp_info:
@@ -27,7 +28,7 @@ class exp_info:
         self.eeg_path = paths().eeg_analysis_path()
         self.raw_path = paths().eeg_raw_path()
         self.results_path = paths().results_path()
-
+        self.log_path = paths().log_path()
 
         # Select subject
         self.subjects_ids = ['S101','S102','S103','S104','S105','S106','S107','S108','S109','S110','S111',
@@ -63,9 +64,21 @@ class exp_info:
 
     def initialize_logging(self):
     # Initialize logging configuration
-        logging.basicConfig(filename=os.path.join(self.results_path,'analysis_log.txt'), level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        logging.info("-----------------------------------------------------")
-        logging.info("-----------------------------------------------------")
+        log_format = '%(asctime)s - %(levelname)s - %(message)s'
+        log_level = logging.INFO
+        log_filename = 'analysis_' + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + '.log'
+        
+        
+        logger = logging.getLogger()
+        logger.setLevel(log_level)
+        # Create a new log file for each run
+        handler = logging.FileHandler( os.path.join(self.log_path, log_filename), mode='w')
+        handler.setFormatter(logging.Formatter(log_format))
+        logger.addHandler(handler)
+        #logging.basicConfig(filename=os.path.join(self.log_path, log_filename), level=log_level, format=log_format)
+        logger.info("-----------------------------------------------------")
+        logger.info("------------LOG INITIALIZATION-----------------------")
+        logger.info("-----------------------------------------------------")
 
 
     
@@ -148,17 +161,7 @@ class eeg_subject:
         # Subject's data paths
         self.eeg_path = pathlib.Path(os.path.join(exp_info.eeg_path, self.subject_id))
         self.bh_path  = pathlib.Path(os.path.join(exp_info.bh_path, self.subject_id))
-
-        # Define subject group and bad channels by matching id index
-        self.bad_channels = exp_info.subjects_bad_channels[self.subject_id]
-        self.group = exp_info.subjects_groups[self.subject_id]
-
-        # Define mapping between button value and color by group
-        if self.group == 'Balanced':
-            self.map = {'blue': '1', 'red': '4'}
-        elif self.group == 'Counterbalanced':
-            self.map = {'blue': '4', 'red': '1'}
-
+       
         # Get run configuration for subject
         self.config = self.subject_config(config=config, subject_id=self.subject_id)
 
@@ -215,45 +218,14 @@ class eeg_subject:
                         setattr(self, general_att, att_value)
 
 
-    # MEG data
-    def load_raw_meg_data(self):
+
+    # EEG data
+    def load_preproc_eeg(self, preload=False):
         """
-        MEG data for parent subject as Raw instance of MNE.
-        """
-
-        print('\nLoading MEG data')
-        # get subject path
-        subj_path = self.ctf_path
-        ds_files = list(subj_path.glob('*{}*.ds'.format(self.subject_id)))
-        ds_files.sort()
-
-        # Load sesions
-        # If more than 1 session concatenate all data to one raw data
-        if len(ds_files) > 1:
-            raws_list = []
-            for i in range(len(ds_files)):
-                raw = mne.io.read_raw_ctf(ds_files[i], system_clock='ignore')
-                raws_list.append(raw)
-            # MEG data structure
-            raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
-            return raw
-        # If only one session return that session as whole raw data
-        elif len(ds_files) == 1:
-            raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
-            return raw
-        # Missing data
-        else:
-            raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
-
-
-
-    # MEG data
-    def load_preproc_meg(self, preload=False):
-        """
-        Preprocessed MEG data for parent subject as raw instance of MNE.
+        Preprocessed EEG data for parent subject as raw instance of MNE.
         """
 
-        print('\nLoading Preprocessed MEG data')
+        print('\nLoading Preprocessed EEG data')
         # get subject path
         preproc_path = paths().preproc_path()
         file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
@@ -280,4 +252,4 @@ class all_subjects:
         
         
 if __name__=='__main__':
-    exp_info().et_channel_names()
+    print(exp_info().et_channel_names)
