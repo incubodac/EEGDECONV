@@ -3,13 +3,55 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 from paths import paths
-import save
-import functions_general
-import functions_analysis
-import mne
+#import save
+#import functions_general
+#import functions_analysis
+#import mne
+#DAC code
+
+def rose_plot(ax, angles, bins=30, density=None, offset=0, lab_unit="degrees",
+              start_zero=False, **param_dict):
+    """
+    Plot polar histogram of angles on ax. ax must have been created using
+    subplot_kw=dict(projection='polar'). Angles are expected in radians.
+    """
+    # Wrap angles to [-pi, pi)
+    angles = (angles+180)*np.pi/180
+    angles = (angles + np.pi) % (2*np.pi) - np.pi
+    
+    # Bin data and record counts
+    count, bin = np.histogram(angles, bins=bins)
+
+    # Compute width of each bin
+    widths = np.diff(bin)
+
+    # By default plot density (frequency potentially misleading)
+    if density is None or density is True:
+        # Area to assign each bin
+        area = count / angles.size
+        # Calculate corresponding bin radius
+        radius = (area / np.pi)**.5
+    else:
+        radius = count
+
+    # Plot data on ax
+    ax.bar(bin[:-1], radius, zorder=1, align='edge', width=widths,
+           edgecolor='black', fill=True, linewidth=.4)
+
+    # Set the direction of the zero angle
+    ax.set_theta_offset(offset)
+
+    # Remove ylabels, they are mostly obstructive and not informative
+    ax.set_yticks([])
+
+    if lab_unit == "radians":
+        label = ['$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$',
+                  r'$\pi$', r'$5\pi/4$', r'$3\pi/2$', r'$7\pi/4$']
+        ax.set_xticklabels(label)
+        
 #joaco code
-save_path = paths().save_path()
-plot_path = paths().plots_path()
+#save_path = paths().save_path()
+#plot_path = paths().plots_path()
 
 
 def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='jet',
@@ -421,18 +463,20 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(paths().mri_path(), 'FreeSurfer_out')):
+# def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(paths().mri_path(), 'FreeSurfer_out')):
 
-    dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
+#     dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
 
-    # Load raw meg data with dig info
-    info_raw = mne.io.read_raw_fif(dig_info_path)
+#     # Load raw meg data with dig info
+#     info_raw = mne.io.read_raw_fif(dig_info_path)
 
-    # Visualize MEG/MRI alignment
-    surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
-    # Try plotting with head skin and brain
-    try:
-        mne.viz.plot_alignment(info_raw.info, subject=subject_code,
-                                     subjects_dir=subjects_dir, surfaces=surfaces,
-                                     show_axes=True, eeg=[],
-                                     )
+#     # Visualize MEG/MRI alignment
+#     surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
+#     # Try plotting with head skin and brain
+#     try:
+#         mne.viz.plot_alignment(info_raw.info, subject=subject_code,
+#                                      subjects_dir=subjects_dir, surfaces=surfaces,
+#                                      show_axes=True, eeg=[],
+#                                      )
+#     except:
+#         pass
