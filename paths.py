@@ -14,11 +14,13 @@ class paths:
         self.name = os.popen('whoami').read()
 
         if self.name == 'dac\n':
-            if not os.path.exists('/Volumes/DAC1T/'):
-                print('HDD not connected\n')
+            if os.path.exists('/media/dac/SSD-curie'):
+                self.main_path = '/media/dac/SSD-curie/Hybrid/'
+            elif os.path.exists('/Volumes/DAC1T/'):
+                self.main_path = '/Volumes/DAC1T/Hybrid/'
             else:
-                '''print('HDD found\n')'''
-            self.main_path = '/Volumes/DAC1T/Hybrid/'
+                print('HDD not connected\n')
+
 
 
         elif self.name == '':
