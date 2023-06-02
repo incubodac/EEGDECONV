@@ -10,11 +10,7 @@ import load
 import setup
 import paths
 #DAC code
-class eye_movements:
-    def __init__(self,suj):
-        self.suj = suj.subject_id
-        self.metadata_file_path =  os.path.join(paths().full_metadata_path(),f'{suj.subject_id}_full_metadata.csv')
-        self.
+
     
 
 

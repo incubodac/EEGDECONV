@@ -49,6 +49,63 @@ def rose_plot(ax, angles, bins=30, density=None, offset=0, lab_unit="degrees",
                   r'$\pi$', r'$5\pi/4$', r'$3\pi/2$', r'$7\pi/4$']
         ax.set_xticklabels(label)
         
+def plot_eye_movements(all_fixations,all_saccades):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Create a figure and subplots
+    fig, axs = plt.subplots(2, 3, figsize=(12, 8))
+
+    # Plot main sequence
+    axs[0, 0].scatter(all_saccades['sac_vmax'], all_saccades['sac_amplitude'],s=1)
+    axs[0, 0].set_xscale('log')
+    axs[0, 0].set_yscale('log')
+    axs[0, 0].set_xlabel('Saccade Amplitude')
+    axs[0, 0].set_ylabel('Saccade Peak Velocity')
+    axs[0, 0].set_title('Main Sequence')
+
+    # Plot  saccades amplitude
+    axs[0, 1].hist(all_saccades['sac_amplitude'], bins=50, edgecolor='black', fill=True, linewidth=.4)
+    axs[0, 1].set_xlabel('saccades Amplitude')
+    axs[0, 1].set_ylabel('Cases')
+    axs[0, 1].set_title('Saccades:  Amplitude')
+
+    # Plot fixation distribution
+    axs[1, 0].hist(all_fixations['duration'],  bins=50, edgecolor='black', fill=True, linewidth=.4)
+    #axs[0, 2].hist(saccades_tmp['duration'], bins=100, alpha=0.5, label='Fixation Durations')
+    axs[1, 0].set_xlabel('Duration [ms]')
+    axs[1, 0].set_ylabel('Cases')
+    axs[1, 0].set_title('Fixations: Duration')
+
+
+    # Plot angular histograms of saccades
+    axs[0, 2] = plt.subplot( 2,3,3,projection='polar')
+    rose_plot(axs[0,2],  all_saccades['sac_angle'])# ,density=False)
+    axs[0, 2].set_xlabel('Saccade Angle (degrees)')
+    axs[0, 2].set_title('Angular Histogram of Saccades')
+
+    # Plot fixations locations
+    axs[1, 2].scatter(all_fixations['fix_avgpos_x'], all_fixations['fix_avgpos_y'],s=1)
+    axs[1, 2].set_xlabel('Horizontal Position [pix]')
+    axs[1, 2].set_ylabel('Vertical Position [pix]')
+    axs[1, 2].set_title('Fixations: Location')
+    axs[1, 2].set_aspect('equal')
+
+    # Plot heatmap
+    fixations_x = all_fixations['fix_avgpos_x']
+    fixations_y = all_fixations['fix_avgpos_y']
+    # Calculate the 2D histogram of fixations
+    heatmap, xedges, yedges = np.histogram2d(fixations_y, fixations_x, bins=120)
+    axs[1, 1].imshow(heatmap, cmap='hot', origin='lower', extent=[ yedges[0], yedges[-1],xedges[0], xedges[-1]])
+    axs[1, 1].set_xlabel('Horizontal Position [pix]')
+    axs[1, 1].set_ylabel('Vertical Position [pix]')
+    axs[1, 1].set_title('Fixations: Heatmap')
+    axs[1, 1].set_title('Heatmap')# Remove empty subplot
+
+    #fig.delaxes(axs[1, 1])
+    plt.subplots_adjust(hspace=0.3)
+    plt.subplots_adjust(wspace=0.3)
+
 #joaco code
 #save_path = paths().save_path()
 #plot_path = paths().plots_path()
