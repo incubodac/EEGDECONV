@@ -1,3 +1,8 @@
+import scipy
+import numpy as np
+
+
+
 
 def create_design_matrix(y_eeg,n_predictors,n_samples_window,timelimits,sr):
     #building design matrix from scratch
