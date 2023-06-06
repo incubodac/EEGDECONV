@@ -118,10 +118,10 @@ class Unfolder(BaseEstimator):
             )
         self.estimator_ = estimator
         del estimator
-        _check_estimator(self.estimator_)
+        #_check_estimator(self.estimator_)
 
         # Create input features
-        n_times, n_epochs, n_feats = X.shape
+        n_times, n_feats = X.shape
         n_outputs = y.shape[-1]
         n_delays = len(self.delays_)
 
@@ -133,38 +133,16 @@ class Unfolder(BaseEstimator):
             )
 
         # Create input features
-        X, y = self._delay_and_reshape(X, y)
+        #X, y = self._delay_and_reshape(X, y)
 
         self.estimator_.fit(X, y)
         coef = get_coef(self.estimator_, "coef_")  # (n_targets, n_features)
         shape = [n_feats, n_delays]
-        if self._y_dim > 1:
-            shape.insert(0, -1)
+    
         self.coef_ = coef.reshape(shape)
 
-        # Inverse-transform model weights
-        if self.patterns:
-            if isinstance(self.estimator_, TimeDelayingRidge):
-                cov_ = self.estimator_.cov_ / float(n_times * n_epochs - 1)
-                y = y.reshape(-1, y.shape[-1], order="F")
-            else:
-                X = X - X.mean(0, keepdims=True)
-                cov_ = np.cov(X.T)
-            del X
-
-            # Inverse output covariance
-            if y.ndim == 2 and y.shape[1] != 1:
-                y = y - y.mean(0, keepdims=True)
-                inv_Y = linalg.pinv(np.cov(y.T))
-            else:
-                inv_Y = 1.0 / float(n_times * n_epochs - 1)
-            del y
-
-            # Inverse coef according to Haufe's method
-            # patterns has shape (n_feats * n_delays, n_outputs)
-            coef = np.reshape(self.coef_, (n_feats * n_delays, n_outputs))
-            patterns = cov_.dot(coef.dot(inv_Y))
-            self.patterns_ = patterns.reshape(shape)
+        coef = np.reshape(self.coef_, (n_feats * n_delays, n_outputs))
+  
 
         return self
     
@@ -176,12 +154,62 @@ class Unfolder(BaseEstimator):
         pass
     
     def score(self, X, y):
-        # Implement the scoring logic for your estimator
-        # X: array-like, shape (n_samples, n_features)
-        # y: array-like, shape (n_samples,)
-        # Your scoring code here
-        # Example: return self.model.score(X, y)
-        pass
+        """Score predictions.
+
+        This calls ``self.predict``, then masks the output of this
+        and ``y` with ``self.valid_samples_``. Finally, it passes
+        this to a :mod:`sklearn.metrics` scorer.
+
+        Parameters
+        ----------
+        X : array, shape (n_times, n_channels)
+            The input features for the model.
+        y : array, shape (n_times, n_outputs])
+            Used for scikit-learn compatibility.
+
+        Returns
+        -------
+        scores : list of float, shape (n_outputs,)
+            The scores estimated by the model for each output (e.g. mean
+            R2 of ``predict(X)``).
+        """
+        # Create our scoring object
+        scorer_ = _SCORERS[self.scoring]
+
+        # Generate predictions, then reshape so we can mask time
+        X, y = self._check_dimensions(X, y, predict=True)[:2]
+        n_times, n_epochs, n_outputs = y.shape
+        y_pred = self.predict(X)
+        y_pred = y_pred[self.valid_samples_]
+        y = y[self.valid_samples_]
+
+        # Re-vectorize and call scorer
+        y = y.reshape([-1, n_outputs], order="F")
+        y_pred = y_pred.reshape([-1, n_outputs], order="F")
+        assert y.shape == y_pred.shape
+        scores = scorer_(y, y_pred, multioutput="raw_values")
+        return scores
+    
+    def _check_dimensions(self, X, y, predict=False):
+        X_dim = X.ndim
+        y_dim = y.ndim if y is not None else 0
+        if X_dim != 2:           
+            raise ValueError(
+                "X must be shape (n_times, features*time delays+1]"
+            )
+        if y is not None:
+            if X.shape[0] != y.shape[0]:
+                raise ValueError(
+                    "X and y do not have the same n_times\n"
+                    "%s != %s" % (X.shape[0], y.shape[0])
+                )
+            if predict and y.shape[-1] != len(self.estimator_.coef_):
+                raise ValueError(
+                    "Number of outputs does not match"
+                    " estimator coefficients dimensions"
+                )
+        return X, y, X_dim, y_dim
+
     
 def _times_to_samples(tmin, tmax, sfreq):
     """Convert a tmin/tmax in seconds to samples."""
@@ -206,6 +234,53 @@ def _times_to_samples(tmin, tmax, sfreq):
 #     # Positive values == cut off rows at the end
 #     max_delay = None if delays[0] >= 0 else delays[0]
 #     return slice(min_delay, max_delay)
+def closest_indices(arr1, arr2):
+    closest_indices = np.empty_like(arr2, dtype=np.intp)
+
+    # Iterate over the values in arr2.
+    for i, val in np.ndenumerate(arr2):
+        # Find the index of the closest value in arr1.
+        closest_index = np.abs(arr1 - val).argmin()
+        closest_indices[i] = closest_index
+    return closest_indices
+
+def create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
+    #building design matrix from scratch
+    from scipy.sparse import csr_matrix
+
+    n_predictors =  len(feature_cols)
+    delays = _delays(tmin,tmax,sr)
+    n_samples_window = len(delays)
+    timelimits = [-.2,.4] #307  samples per predictor * 4
+
+
+    expanded_params = (1+n_predictors)*n_samples_window
+    signal_longitud_in_samples = raw.n_times
+
+
+    X = np.zeros([signal_longitud_in_samples, expanded_params])
+
+
+    zero_idx=closest_indices(delays,0)
+    evt_to_model = events[events['type'] == intercept_evt]
+    count_events = len(evt_to_model)
+    evt_lat = evt_to_model['latency'].value
+    features = ['type'] + feature_cols  
+
+    for beta in range(n_predictors+1):
+        
+        j_idx = np.arange(beta*n_samples_window,beta*n_samples_window+n_samples_window)   
+        for j in j_idx:   
+            for i in range(count_events):
+                X[evt_lat[i]+j-beta*n_samples_window-zero_idx,j] = evt_to_model[features[beta]].values[i]
+    X_sparse = csr_matrix(X)
+    return X_sparse
+
+def _delays(tmin, tmax, sfreq):
+    """Convert a tmin/tmax in seconds to delays."""
+    # Convert seconds to samples
+    delays = np.arange(int(np.round(tmin * sfreq)), int(np.round(tmax * sfreq) + 1))
+    return delays
 
 
 
@@ -220,10 +295,12 @@ _SCORERS = {"r2": _r2_score}#, "corrcoef": _corr_score}
 if __name__=='__main__':
     from sklearn.linear_model import LinearRegression
     feature_cols = ['mss']
-    intercept    = ['fixation']
+    intercept_evt   = ['fixation']
     tmin ,tmax = -.2 , .4
     sfreq = 500
     unf=Unfolder(
          tmin, tmax, sfreq, feature_cols, estimator=LinearRegression(),scoring='r2'
     )
     print(unf)
+    
+    create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
