@@ -16,8 +16,8 @@ class paths:
         if self.name == 'dac\n':
             if os.path.exists('/media/dac/SSD-curie'):
                 self.main_path = '/media/dac/SSD-curie/Hybrid/'
-            elif os.path.exists('/Volumes/DAC1T/'):
-                self.main_path = '/Volumes/DAC1T/Hybrid/'
+            elif os.path.exists('/Volumes/DAC500/'):
+                self.main_path = '/Volumes/DAC500/Hybrid/'
             else:
                 print('HDD not connected\n')
 

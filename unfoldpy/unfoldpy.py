@@ -1,6 +1,7 @@
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, is_regressor 
+from mne.decoding import get_coef
 import numpy as np
-
+import numbers
 
 
 
@@ -26,6 +27,8 @@ class Unfolder(BaseEstimator):
         self.fit_intercept = fit_intercept
         self.scoring = scoring
         self.n_jobs = n_jobs
+        self.delays_ = len(_delays(tmin,tmax,sfreq))
+        self.verbose = verbose
         
     def __repr__(self):  
         s = "tmin, tmax : (%.3f, %.3f), " % (self.tmin, self.tmax)
@@ -80,24 +83,13 @@ class Unfolder(BaseEstimator):
                 "tmin (%s) must be at most tmax (%s)" % (self.tmin, self.tmax)
             )
         # Initialize delays
-        self.delays_ = _times_to_delays(self.tmin, self.tmax, self.sfreq)
+        #self.delays_ = _times_to_delays(self.tmin, self.tmax, self.sfreq)
 
         # Define the slice that we should use in the middle
-        self.valid_samples_ = _delays_to_slice(self.delays_)
+        #self.valid_samples_ = _delays_to_slice(self.delays_)
 
-        if isinstance(self.estimator, numbers.Real):
-            if self.fit_intercept is None:
-                self.fit_intercept = True
-            estimator = TimeDelayingRidge(
-                self.tmin,
-                self.tmax,
-                self.sfreq,
-                alpha=self.estimator,
-                fit_intercept=self.fit_intercept,
-                n_jobs=self.n_jobs,
-                edge_correction=self.edge_correction,
-            )
-        elif is_regressor(self.estimator):
+
+        if is_regressor(self.estimator):
             estimator = clone(self.estimator)
             if (
                 self.fit_intercept is not None
@@ -123,10 +115,10 @@ class Unfolder(BaseEstimator):
         # Create input features
         n_times, n_feats = X.shape
         n_outputs = y.shape[-1]
-        n_delays = len(self.delays_)
+        n_delays = self.delays_
 
         # Update feature names if we have none
-        if (self.feature_names is not None) and (len(self.feature_names) != n_feats):
+        if (self.feature_names is not None) and ((len(self.feature_names)+1)*n_delays != n_feats):
             raise ValueError(
                 "n_features in X does not match feature names "
                 "(%s != %s)" % (n_feats, len(self.feature_names))
@@ -137,11 +129,11 @@ class Unfolder(BaseEstimator):
 
         self.estimator_.fit(X, y)
         coef = get_coef(self.estimator_, "coef_")  # (n_targets, n_features)
-        shape = [n_feats, n_delays]
+        shape = [128, n_delays]
     
         self.coef_ = coef.reshape(shape)
 
-        coef = np.reshape(self.coef_, (n_feats * n_delays, n_outputs))
+        coef = np.reshape(self.coef_, (n_feats , n_outputs))
   
 
         return self
@@ -247,11 +239,14 @@ def closest_indices(arr1, arr2):
 def create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
     #building design matrix from scratch
     from scipy.sparse import csr_matrix
-
-    n_predictors =  len(feature_cols)
+    #modify this to yield 0 pred for empty 1 for str and num of elements for a list
+    if feature_cols==None:
+        n_predictors = 0
+    else:
+        n_predictors =  len(feature_cols)
     delays = _delays(tmin,tmax,sr)
     n_samples_window = len(delays)
-    timelimits = [-.2,.4] #307  samples per predictor * 4
+    #timelimits = [-.2,.4] #307  samples per predictor * 4
 
 
     expanded_params = (1+n_predictors)*n_samples_window
@@ -263,9 +258,12 @@ def create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
 
     zero_idx=closest_indices(delays,0)
     evt_to_model = events[events['type'] == intercept_evt]
+    evt_to_model.loc[:,'type'] = 1 #set intercept column to 1
+    
     count_events = len(evt_to_model)
-    evt_lat = evt_to_model['latency'].value
-    features = ['type'] + feature_cols  
+    evt_lat = evt_to_model['latency']
+    evt_lat = evt_lat.values.astype(int)
+    features = ['type'] + [feature_cols]
 
     for beta in range(n_predictors+1):
         
@@ -294,13 +292,24 @@ _SCORERS = {"r2": _r2_score}#, "corrcoef": _corr_score}
 
 if __name__=='__main__':
     from sklearn.linear_model import LinearRegression
-    feature_cols = ['mss']
-    intercept_evt   = ['fixation']
+    from utils import exp_info, paths, subject
+    info = exp_info()
+    info.initialize_logging()
+    metadata_path = paths().full_metadata_path()
+    subjects_ids = info.subjects_ids
+    from unfoldpy import Unfolder, create_design_matrix
+    #----------parameters-------------
+    eeg = subject(info,0).load_analysis_eeg()
+    evts = subject(info,0).load_metadata()
+    from sklearn.linear_model import LinearRegression
+    feature_cols = []#'mss'
+    intercept_evt   = 'fixation'
     tmin ,tmax = -.2 , .4
-    sfreq = 500
+    sr = 500
     unf=Unfolder(
-         tmin, tmax, sfreq, feature_cols, estimator=LinearRegression(),scoring='r2'
+            tmin, tmax, sr, feature_cols, estimator=LinearRegression(),scoring='r2'
     )
     print(unf)
-    
-    create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
+
+    X = create_design_matrix(eeg,tmin,tmax,evts,intercept_evt, feature_cols,sr)
+    print(X)

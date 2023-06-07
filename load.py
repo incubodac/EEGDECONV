@@ -265,6 +265,24 @@ class subject:
         montage = mne.channels.make_standard_montage('biosemi128')
         raw.set_montage(montage, on_missing='ignore')
         return raw
+    
+    def load_metadata(self):
+        tprint('''\nLoading events data.....
+        from\n''',font="fancy67")        # get subject path
+        sub_id = self.subject_id
+        metadata_path =  paths().full_metadata_path()
+        evts_file =  os.path.join(metadata_path,f'{sub_id}_full_metadata.csv')
+        tprint(evts_file +'\n',font="fancy67")
+        # Load sesions
+        try:
+            df = pd.read_csv(evts_file)
+            logger = logging.getLogger()
+            logger.info("Events csv from subject %s was loaded",self.subject_id)
+            logger.info("-----------------------------------------------------")
+            return df
+        # Missing data
+        except FileNotFoundError:
+            print('No event files found in directory: {}'.format(evts_path))
 
 
 if __name__== '__main__':
