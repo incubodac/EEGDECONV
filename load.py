@@ -184,12 +184,14 @@ class subject:
         elif type(subject_code) == str and (subject_code in exp_info.subjects_ids):
             subject_id = subject_code
         else:
+            subject_id = None
             print('Subject not found.')
-            
-        self.subject_id   = subject_id
-        logger = logging.getLogger()
-        logger.info("Class containing subject %s information was loaded",self.subject_id)
-        logger.info("-----------------------------------------------------")
+
+        if subject_id is not None:    
+            self.subject_id   = subject_id
+            logger = logging.getLogger()
+            logger.info("Class containing subject %s information was loaded",subject_id)
+            logger.info("-----------------------------------------------------")
 
     
     def load_bh_csv(self):
