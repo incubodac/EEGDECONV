@@ -1,7 +1,7 @@
 import logging
 import load
 import os
-
+import numpy as np
 
 
 def start_stop_samples_trigg(evts,trigg):
@@ -304,6 +304,22 @@ def create_full_metadata(info,sub_id,metadata_path,capturing_thr,save_evts=False
         logger = logging.getLogger()
         logger.info("saving full metadata for subject: %s ", sub_id)
     return evts
+
+def calculate_rms(evoked, channels, tmin, tmax):
+    # Extract the data from the specified channels
+    channel_data = evoked.copy().pick_channels(channels).data
+
+    # Get the time indices corresponding to tmin and tmax
+    tmin_idx = int(evoked.time_as_index(tmin))
+    tmax_idx = int(evoked.time_as_index(tmax))
+
+    # Slice the data from tmin to tmax
+    sliced_data = channel_data[:, tmin_idx:tmax_idx]
+
+    # Calculate the RMS along the time axis
+    rms = np.sqrt(np.mean(sliced_data**2, axis=1))
+
+    return rms
 
 if __name__ == '__main__':
     import setup
