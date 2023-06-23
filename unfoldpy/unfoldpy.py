@@ -117,11 +117,19 @@ class Unfolder(BaseEstimator):
         n_outputs = y.shape[-1]
         n_delays = self.delays_
 
+        if self.feature_names==None:
+            n_predictors = 0
+        else:
+            if type(self.feature_names) is list:
+                n_predictors =  len(self.feature_names)
+            elif type(self.feature_names) is str:
+                n_predictors =  1
+        print(f'features times delays {(n_predictors+1)*n_delays } /n  n_feats {n_feats}')
         # Update feature names if we have none
-        if (self.feature_names is not None) and ((len(self.feature_names)+1)*n_delays != n_feats):
+        if (self.feature_names is not None) and (( n_predictors+1)*n_delays != n_feats):
             raise ValueError(
                 "n_features in X does not match feature names "
-                "(%s != %s)" % (n_feats, len(self.feature_names))
+                "(%s != %s)" % (n_feats, 42) 
             )
 
         # Create input features
@@ -129,7 +137,7 @@ class Unfolder(BaseEstimator):
 
         self.estimator_.fit(X, y)
         coef = get_coef(self.estimator_, "coef_")  # (n_targets, n_features)
-        shape = [128, n_delays]
+        shape = [128, n_delays*(n_predictors+1)]
     
         self.coef_ = coef.reshape(shape)
 
@@ -247,7 +255,7 @@ def create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
             n_predictors =  len(feature_cols)
         elif type(feature_cols) is str:
             n_predictors =  1
-            
+          
     delays = _delays(tmin,tmax,sr)
     n_samples_window = len(delays)
     #timelimits = [-.2,.4] #307  samples per predictor * 4
