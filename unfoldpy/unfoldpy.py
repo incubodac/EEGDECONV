@@ -243,7 +243,11 @@ def create_design_matrix(raw,tmin,tmax,events,intercept_evt, feature_cols,sr):
     if feature_cols==None:
         n_predictors = 0
     else:
-        n_predictors =  len(feature_cols)
+        if type(feature_cols) is list:
+            n_predictors =  len(feature_cols)
+        elif type(feature_cols) is str:
+            n_predictors =  1
+            
     delays = _delays(tmin,tmax,sr)
     n_samples_window = len(delays)
     #timelimits = [-.2,.4] #307  samples per predictor * 4
